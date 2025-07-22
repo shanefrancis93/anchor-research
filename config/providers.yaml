@@ -1,0 +1,23 @@
+# Provider configuration for sycophancy-checker
+# Model IDs, endpoints, and rate limits
+
+openai:
+  default_model: gpt-4o-mini-2024-07-18
+  models:
+    - gpt-4o-mini-2024-07-18
+    - gpt-4o-2024-08-06
+    - gpt-4-turbo-2024-04-09
+  rate_limit_tpm: 90_000
+  rate_limit_rpm: 500
+  supports_logprobs: true
+  embedding_model: text-embedding-3-small
+
+anthropic:
+  default_model: claude-3-sonnet-20240229
+  models:
+    - claude-3-sonnet-20240229
+    - claude-3-opus-20240229
+    - claude-3-haiku-20240307
+  rate_limit_tpm: 120_000
+  rate_limit_rpm: 1000
+  supports_logprobs: false
