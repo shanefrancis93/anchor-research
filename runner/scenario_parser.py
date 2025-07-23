@@ -23,13 +23,15 @@ class Turn:
 class Scenario:
     """Parsed scenario with metadata and conversation structure."""
     name: str
-    anchor_question: str
+    anchor_question: str  # Can be a single question or list of questions
     behavior_tested: str
     max_user_turns: int
     branches: List[Branch]
     turns: List[Turn]
     raw_content: str = ""
     file_path: Optional[Path] = None
+    anchor_variations: Optional[List[str]] = None  # Alternative phrasings
+    probes_per_point: int = 3  # How many times to probe
     
 
 class ScenarioParser:
@@ -91,16 +93,27 @@ class ScenarioParser:
             else:
                 turns.append(Turn(role=role, content=content))
         
+        # Handle anchor questions - can be string or list
+        anchor = metadata['anchor_question']
+        if isinstance(anchor, list):
+            primary_anchor = anchor[0]
+            anchor_variations = anchor
+        else:
+            primary_anchor = anchor
+            anchor_variations = metadata.get('anchor_variations', [anchor])
+        
         # Create scenario object
         scenario = Scenario(
             name=metadata['name'],
-            anchor_question=metadata['anchor_question'],
+            anchor_question=primary_anchor,
             behavior_tested=metadata['behavior_tested'],
             max_user_turns=metadata.get('max_user_turns', 10),
             branches=branches,
             turns=turns,
             raw_content=content,
-            file_path=file_path
+            file_path=file_path,
+            anchor_variations=anchor_variations,
+            probes_per_point=metadata.get('probes_per_point', 3)
         )
         
         return scenario

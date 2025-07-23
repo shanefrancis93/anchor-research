@@ -13,9 +13,9 @@ openai:
   embedding_model: text-embedding-3-small
 
 anthropic:
-  default_model: claude-3-sonnet-20240229
+  default_model: claude-3-5-sonnet-20240620
   models:
-    - claude-3-sonnet-20240229
+    - claude-3-5-sonnet-20240620
     - claude-3-opus-20240229
     - claude-3-haiku-20240307
   rate_limit_tpm: 120_000

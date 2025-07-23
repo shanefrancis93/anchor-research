@@ -4,6 +4,7 @@ from typing import Dict, List, Any, Optional
 import logging
 from openai import AsyncOpenAI
 import tiktoken
+import httpx
 
 from .base_driver import ChatDriver
 
@@ -18,7 +19,10 @@ class OpenAIDriver(ChatDriver):
         if not self.api_key:
             raise ValueError("OpenAI API key not provided")
         
-        self.client = AsyncOpenAI(api_key=self.api_key)
+        self.client = AsyncOpenAI(
+            api_key=self.api_key,
+            timeout=httpx.Timeout(30.0, connect=5.0)
+        )
         self.model = model
         self._encoding = None
         

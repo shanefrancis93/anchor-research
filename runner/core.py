@@ -29,6 +29,7 @@ class TurnResult:
     """Results from a single turn execution."""
     primary_response: Dict[str, Any]
     anchor_probe_response: Optional[Dict[str, Any]] = None
+    anchor_probe_responses: Optional[List[Dict[str, Any]]] = None
     metrics: Dict[str, Any] = field(default_factory=dict)
     
 
@@ -135,28 +136,40 @@ class ConversationRunner:
             })
             state.total_tokens += primary_response.get("tokens", 0)
             
-            # Transient anchor probe (don't add to history)
-            anchor_response = None
+            # Multiple transient anchor probes (don't add to history)
+            anchor_responses = []
             if scenario.anchor_question:
-                probe_messages = state.messages + [
-                    {"role": "user", "content": scenario.anchor_question}
-                ]
-                anchor_response = await self.driver.chat(
-                    messages=probe_messages,
-                    **self.config
-                )
-                state.total_tokens += anchor_response.get("tokens", 0)
+                # Get anchor variations to use
+                anchor_questions = scenario.anchor_variations or [scenario.anchor_question]
+                num_probes = min(scenario.probes_per_point, len(anchor_questions))
+                
+                # Probe multiple times with variations
+                for i in range(num_probes):
+                    question = anchor_questions[i % len(anchor_questions)]
+                    probe_messages = state.messages + [
+                        {"role": "user", "content": question}
+                    ]
+                    anchor_response = await self.driver.chat(
+                        messages=probe_messages,
+                        **self.config
+                    )
+                    state.total_tokens += anchor_response.get("tokens", 0)
+                    anchor_responses.append({
+                        "question": question,
+                        "response": anchor_response
+                    })
             
             # Special handling for anchor_guard branch
-            if branch_id == "anchor_guard" and scenario.anchor_question:
-                # Append anchor Q&A to history
+            if branch_id == "anchor_guard" and scenario.anchor_question and anchor_responses:
+                # Append first anchor Q&A to history
+                first_probe = anchor_responses[0]
                 state.messages.append({
                     "role": "user",
-                    "content": scenario.anchor_question
+                    "content": first_probe["question"]
                 })
                 state.messages.append({
                     "role": "assistant",
-                    "content": anchor_response["content"] if anchor_response else ""
+                    "content": first_probe["response"]["content"]
                 })
             
             # Evaluate responses
@@ -164,14 +177,16 @@ class ConversationRunner:
                 "turn": state.turn_count,
                 "branch": branch_id,
                 "tokens_primary": primary_response.get("tokens", 0),
-                "tokens_probe": anchor_response.get("tokens", 0) if anchor_response else 0,
+                "tokens_probe": sum(ar["response"].get("tokens", 0) for ar in anchor_responses),
+                "num_anchor_probes": len(anchor_responses)
             }
             
             if evaluators:
                 for evaluator in evaluators:
+                    # Pass all anchor responses for clustering analysis
                     eval_metrics = await evaluator.evaluate(
                         primary_response=primary_response,
-                        anchor_response=anchor_response,
+                        anchor_responses=anchor_responses,  # Changed from single to multiple
                         scenario=scenario,
                         state=state
                     )
@@ -179,7 +194,8 @@ class ConversationRunner:
             
             result = TurnResult(
                 primary_response=primary_response,
-                anchor_probe_response=anchor_response,
+                anchor_probe_response=anchor_responses[0]["response"] if anchor_responses else None,
+                anchor_probe_responses=anchor_responses,  # Store all probes
                 metrics=metrics
             )
             

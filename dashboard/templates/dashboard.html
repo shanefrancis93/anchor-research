@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anchor Research Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+
+        .session-info {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            margin-top: 0.5rem;
+        }
+
+        .main-container {
+            display: flex;
+            height: calc(100vh - 120px);
+            gap: 1rem;
+            padding: 1rem 2rem;
+        }
+
+        .chat-panel {
+            flex: 1;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .anchor-forks-panel {
+            flex: 1;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .chat-input-area {
+            padding: 1rem;
+            background-color: #f8f9fa;
+        }
+
+        .chat-input {
+            width: 100%;
+            min-height: 80px;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        .send-button {
+            margin-top: 0.5rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .turn-fork {
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            overflow: hidden;
+        }
+
+        .turn-fork-header {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 0.75rem;
+            font-weight: 600;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .fork-button {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .anchor-queries {
+            padding: 1rem;
+        }
+
+        .anchor-query {
+            background-color: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .query-input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 0.5rem;
+        }
+
+        .query-response {
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 0.5rem;
+            min-height: 60px;
+            font-style: italic;
+            color: #666;
+        }
+
+        .panel-header {
+            padding: 1rem;
+            border-bottom: 1px solid #e0e0e0;
+            font-weight: 600;
+            background-color: #f8f9fa;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .progress-bar {
+            height: 6px;
+            background-color: #e0e0e0;
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 0.5rem 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #45a049);
+            transition: width 0.3s ease;
+        }
+
+        .conversation-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .message {
+            margin-bottom: 1rem;
+            padding: 0.75rem;
+            border-radius: 8px;
+            border-left: 4px solid;
+        }
+
+        .message.system {
+            background-color: #f0f0f0;
+            border-left-color: #666;
+        }
+
+        .message.user {
+            background-color: #e3f2fd;
+            border-left-color: #2196F3;
+        }
+
+        .message.assistant {
+            background-color: #f3e5f5;
+            border-left-color: #9c27b0;
+        }
+
+        .message-role {
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+            opacity: 0.7;
+        }
+
+        .message-content {
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+
+        .anchor-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .anchor-turn {
+            margin-bottom: 1.5rem;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .anchor-turn-header {
+            background-color: #f8f9fa;
+            padding: 0.75rem;
+            font-weight: 600;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .anchor-question {
+            padding: 0.75rem;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .anchor-question:last-child {
+            border-bottom: none;
+        }
+
+        .question-text {
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: #444;
+        }
+
+        .response-text {
+            color: #666;
+            font-size: 0.9rem;
+            font-style: italic;
+        }
+
+        .response-pending {
+            color: #999;
+            font-size: 0.9rem;
+        }
+
+        .controls {
+            padding: 1rem;
+            border-top: 1px solid #e0e0e0;
+            background-color: #f8f9fa;
+        }
+
+        .control-group {
+            margin-bottom: 1rem;
+        }
+
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        select, input, textarea, button {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 60px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            transition: opacity 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+
+        .status-active {
+            background-color: #4CAF50;
+        }
+
+        .status-pending {
+            background-color: #FF9800;
+        }
+
+        .status-complete {
+            background-color: #2196F3;
+        }
+
+        .anchor-stats {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            font-size: 0.85rem;
+        }
+
+        .stat-item {
+            background-color: #f0f0f0;
+            padding: 0.5rem;
+            border-radius: 4px;
+            text-align: center;
+            flex: 1;
+        }
+
+        .stat-value {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #666;
+            margin-top: 0.25rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔗 Anchor Research Dashboard</h1>
+        <div class="session-info" id="sessionInfo">
+            No active session
+        </div>
+    </div>
+
+    <div class="main-container">
+        <!-- Live Chat Panel -->
+        <div class="chat-panel">
+            <div class="panel-header">
+                <div>💬 Live Chat</div>
+                <div style="font-size: 0.8rem; color: #666; margin-top: 0.5rem;" id="chatStatus">
+                    Select scenario to start chatting
+                </div>
+            </div>
+            
+            <!-- Chat Messages -->
+            <div class="chat-messages" id="chatMessages">
+                <div style="text-align: center; color: #999; padding: 2rem;">
+                    Start a session to begin live conversation
+                </div>
+            </div>
+            
+            <!-- Chat Input -->
+            <div class="chat-input-area">
+                <textarea id="chatInput" class="chat-input" placeholder="Type your message here..." disabled></textarea>
+                <button id="sendButton" class="send-button" disabled>Send Message</button>
+            </div>
+            
+            <!-- Session Controls -->
+            <div class="controls">
+                <div class="control-group">
+                    <label for="scenarioSelect">Scenario:</label>
+                    <select id="scenarioSelect">
+                        <option value="">Loading scenarios...</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="modelSelect">Model:</label>
+                    <select id="modelSelect">
+                        <option value="gpt-4">GPT-4</option>
+                        <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                        <option value="claude-3-opus">Claude 3 Opus</option>
+                        <option value="claude-3-sonnet">Claude 3 Sonnet</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <button id="startSessionBtn">Start Chat Session</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Anchor Forks Panel -->
+        <div class="anchor-forks-panel">
+            <div class="panel-header">
+                <div>🔗 Anchor Forks</div>
+                <div style="font-size: 0.8rem; color: #666; margin-top: 0.5rem;">
+                    Per-turn anchor questions & latent value probes
+                </div>
+            </div>
+            
+            <div class="anchor-content" id="anchorForksContent">
+                <div style="text-align: center; color: #999; padding: 2rem;">
+                    Anchor forks will appear here after each conversation turn
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Socket.IO
+        const socket = io();
+        let currentSession = null;
+
+        // DOM elements
+        const sessionInfo = document.getElementById('sessionInfo');
+        const scenarioSelect = document.getElementById('scenarioSelect');
+        const modelSelect = document.getElementById('modelSelect');
+        const startSessionBtn = document.getElementById('startSessionBtn');
+        const chatMessages = document.getElementById('chatMessages');
+        const chatInput = document.getElementById('chatInput');
+        const sendButton = document.getElementById('sendButton');
+        const chatStatus = document.getElementById('chatStatus');
+        const anchorForksContent = document.getElementById('anchorForksContent');
+
+        // Load scenarios on page load
+        loadScenarios();
+
+        // Event listeners
+        startSessionBtn.addEventListener('click', startNewSession);
+        sendButton.addEventListener('click', sendChatMessage);
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendChatMessage();
+            }
+        });
+
+        // Socket event listeners
+        socket.on('session_updated', updateSession);
+
+        async function loadScenarios() {
+            try {
+                const response = await fetch('/api/scenarios');
+                const scenarios = await response.json();
+                
+                scenarioSelect.innerHTML = '<option value="">Select scenario...</option>';
+                scenarios.forEach(scenario => {
+                    const option = document.createElement('option');
+                    option.value = scenario.id;
+                    option.textContent = `${scenario.name} (${scenario.behavior_tested})`;
+                    scenarioSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading scenarios:', error);
+            }
+        }
+
+        async function startNewSession() {
+            const scenarioId = scenarioSelect.value;
+            const model = modelSelect.value;
+            
+            if (!scenarioId) {
+                alert('Please select a scenario');
+                return;
+            }
+
+            const sessionId = `session_${Date.now()}`;
+            
+            try {
+                const response = await fetch(`/api/session/${sessionId}/start`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        scenario_id: scenarioId,
+                        model: model,
+                        branch: 'baseline'
+                    })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    currentSession = sessionId;
+                    currentScenario = {
+                        anchor_questions: result.session.anchor_questions || []
+                    };
+                    socket.emit('join_session', { session_id: sessionId });
+                    
+                    // Enable chat interface
+                    chatInput.disabled = false;
+                    sendButton.disabled = false;
+                    chatStatus.textContent = `Ready to chat with ${model} using ${result.session.scenario_name}`;
+                    
+                    // Clear chat messages and anchor forks
+                    chatMessages.innerHTML = '';
+                    anchorForksContent.innerHTML = '<div style="text-align: center; color: #999; padding: 2rem;">Anchor forks will appear here after each conversation turn</div>';
+                    turnCounter = 0;
+                    
+                    if (result.session.conversation && result.session.conversation.length > 0) {
+                        const systemMsg = result.session.conversation[0];
+                        if (systemMsg.role === 'system') {
+                            addChatMessage('system', systemMsg.content);
+                        }
+                    }
+                } else {
+                    alert('Error starting session: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Error starting session:', error);
+                alert('Error starting session');
+            }
+        }
+
+        async function sendChatMessage() {
+            if (!currentSession) {
+                alert('No active session');
+                return;
+            }
+
+            const content = chatInput.value.trim();
+            if (!content) {
+                return;
+            }
+
+            // Add user message to chat
+            addChatMessage('user', content);
+            chatInput.value = '';
+            
+            // Send to backend
+            try {
+                const response = await fetch(`/api/session/${currentSession}/message`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        role: 'user',
+                        content: content
+                    })
+                });
+
+                const result = await response.json();
+                if (!result.success) {
+                    alert('Error sending message: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Error sending message:', error);
+                alert('Error sending message');
+            }
+            
+            // Get real AI response
+            try {
+                const aiResponse = await fetch(`/api/session/${currentSession}/ai_response`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await aiResponse.json();
+                if (result.success) {
+                    addChatMessage('assistant', result.response);
+                    createAnchorFork();
+                } else {
+                    addChatMessage('assistant', `[Error: ${result.error}]`);
+                }
+            } catch (error) {
+                console.error('Error getting AI response:', error);
+                addChatMessage('assistant', '[Error: Failed to get AI response]');
+            }
+        }
+        
+        function addChatMessage(role, content) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+            
+            const roleIcon = role === 'system' ? '⚙️' : role === 'user' ? '👤' : '🤖';
+            
+            messageDiv.innerHTML = `
+                <div class="message-role">${roleIcon} ${role.toUpperCase()}</div>
+                <div class="message-content">${content}</div>
+            `;
+            
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        let turnCounter = 0;
+        let currentScenario = null;
+        
+        function createAnchorFork() {
+            turnCounter++;
+            
+            if (!currentScenario || !currentScenario.anchor_questions) {
+                return;
+            }
+            
+            const forkDiv = document.createElement('div');
+            forkDiv.className = 'turn-fork';
+            forkDiv.id = `fork-turn-${turnCounter}`;
+            
+            const headerDiv = document.createElement('div');
+            headerDiv.className = 'turn-fork-header';
+            headerDiv.innerHTML = `
+                <span>Turn ${turnCounter} Anchor Fork</span>
+                <button class="fork-button" onclick="forkConversation(${turnCounter})">🔀 Fork & Query</button>
+            `;
+            forkDiv.appendChild(headerDiv);
+            
+            const queriesDiv = document.createElement('div');
+            queriesDiv.className = 'anchor-queries';
+            
+            // Add anchor questions
+            currentScenario.anchor_questions.forEach((question, index) => {
+                const queryDiv = document.createElement('div');
+                queryDiv.className = 'anchor-query';
+                queryDiv.innerHTML = `
+                    <div style="font-weight: 500; margin-bottom: 0.5rem;">${question}</div>
+                    <input type="text" class="query-input" placeholder="Ask this question to the AI..." 
+                           onkeypress="if(event.key==='Enter') queryAnchor(${turnCounter}, ${index}, this.value)">
+                    <div class="query-response" id="response-${turnCounter}-${index}">⏳ Press Enter to query...</div>
+                `;
+                queriesDiv.appendChild(queryDiv);
+            });
+            
+            // Add custom latent value probe
+            const customDiv = document.createElement('div');
+            customDiv.className = 'anchor-query';
+            customDiv.innerHTML = `
+                <div style="font-weight: 500; margin-bottom: 0.5rem; color: #667eea;">🔍 Custom Latent Value Probe</div>
+                <input type="text" class="query-input" placeholder="Ask a custom probe question..." 
+                       onkeypress="if(event.key==='Enter') queryCustom(${turnCounter}, this.value)">
+                <div class="query-response" id="custom-${turnCounter}">💭 Enter your own probe question...</div>
+            `;
+            queriesDiv.appendChild(customDiv);
+            
+            forkDiv.appendChild(queriesDiv);
+            anchorForksContent.appendChild(forkDiv);
+            
+            // Clear the placeholder text
+            if (anchorForksContent.children.length === 1) {
+                const placeholder = anchorForksContent.querySelector('div[style*="text-align: center"]');
+                if (placeholder) placeholder.remove();
+            }
+        }
+        
+        async function queryAnchor(turn, questionIndex, query) {
+            if (!query.trim()) return;
+            
+            const responseDiv = document.getElementById(`response-${turn}-${questionIndex}`);
+            responseDiv.textContent = '🤔 Querying AI...';
+            
+            try {
+                const response = await fetch(`/api/session/${currentSession}/anchor_query`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        query: query,
+                        turn: turn
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    responseDiv.textContent = result.response;
+                    responseDiv.style.fontStyle = 'normal';
+                    responseDiv.style.color = '#333';
+                } else {
+                    responseDiv.textContent = `[Error: ${result.error}]`;
+                    responseDiv.style.color = '#d32f2f';
+                }
+            } catch (error) {
+                console.error('Error querying anchor:', error);
+                responseDiv.textContent = '[Error: Failed to query AI]';
+                responseDiv.style.color = '#d32f2f';
+            }
+        }
+        
+        async function queryCustom(turn, query) {
+            if (!query.trim()) return;
+            
+            const responseDiv = document.getElementById(`custom-${turn}`);
+            responseDiv.textContent = '🤔 Probing latent values...';
+            
+            try {
+                const response = await fetch(`/api/session/${currentSession}/anchor_query`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        query: query,
+                        turn: turn
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    responseDiv.textContent = result.response;
+                    responseDiv.style.fontStyle = 'normal';
+                    responseDiv.style.color = '#333';
+                } else {
+                    responseDiv.textContent = `[Error: ${result.error}]`;
+                    responseDiv.style.color = '#d32f2f';
+                }
+            } catch (error) {
+                console.error('Error querying custom probe:', error);
+                responseDiv.textContent = '[Error: Failed to query AI]';
+                responseDiv.style.color = '#d32f2f';
+            }
+        }
+        
+        function forkConversation(turn) {
+            alert(`Fork functionality: This would create a separate conversation branch from turn ${turn} for isolated anchor testing.`);
+        }
+
+        function updateSession(session) {
+            // Update session info
+            sessionInfo.textContent = `${session.scenario_name} | ${session.model} | Active Chat Session`;
+            
+            // Update chat messages if needed
+            if (session.conversation) {
+                // Only add new messages that aren't already displayed
+                const currentMessages = chatMessages.children.length;
+                const newMessages = session.conversation.slice(currentMessages);
+                
+                newMessages.forEach(message => {
+                    if (message.role !== 'system' || currentMessages === 0) {
+                        addChatMessage(message.role, message.content);
+                    }
+                });
+            }
+        }
+    </script>
+</body>
+</html>

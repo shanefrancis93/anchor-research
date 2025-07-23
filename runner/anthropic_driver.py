@@ -3,6 +3,7 @@ import asyncio
 from typing import Dict, List, Any, Optional
 import logging
 from anthropic import AsyncAnthropic
+import httpx
 
 from .base_driver import ChatDriver
 
@@ -17,7 +18,10 @@ class AnthropicDriver(ChatDriver):
         if not self.api_key:
             raise ValueError("Anthropic API key not provided")
         
-        self.client = AsyncAnthropic(api_key=self.api_key)
+        self.client = AsyncAnthropic(
+            api_key=self.api_key,
+            timeout=httpx.Timeout(30.0, connect=5.0)
+        )
         self.model = model
         
     async def chat(self, messages: List[Dict[str, str]], **kwargs) -> Dict[str, Any]:

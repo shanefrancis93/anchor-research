@@ -7,7 +7,7 @@
 - [x] Create project structure and folders
 - [x] Set up configuration files (providers.yaml, settings.yaml)
 - [x] Create .env.example and requirements.txt
-- [ ] Initialize git repository
+- [x] Initialize git repository
 
 ### Day 3-4: Core Components
 - [ ] Implement base ChatDriver interface

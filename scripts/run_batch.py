@@ -14,6 +14,10 @@ import pandas as pd
 from datetime import datetime
 import os
 from typing import List, Dict, Any
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent))
@@ -21,7 +25,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 from runner import OpenAIDriver, AnthropicDriver, ConversationRunner
 from runner.scenario_parser import ScenarioParser
 from runner.utils import create_output_dir, estimate_scenario_cost
-from evaluators import PushbackEvaluator, AnchorDriftEvaluator, EmbeddingDriver
+from evaluators import PushbackEvaluator, AnchorDriftEvaluator, EmbeddingDriver, ResponseClusteringEvaluator
 
 
 def setup_logging(level: str = "INFO"):
@@ -73,7 +77,10 @@ async def run_model_scenarios(
     driver = create_driver(provider, model, config)
     
     # Create evaluators
-    evaluators = [PushbackEvaluator()]
+    evaluators = [
+        PushbackEvaluator(),
+        ResponseClusteringEvaluator()  # For analyzing multiple anchor probes
+    ]
     
     # Add embedding evaluator for OpenAI
     if provider == "openai":
